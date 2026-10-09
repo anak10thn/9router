@@ -220,6 +220,21 @@ describe("DefaultExecutor.buildHeaders() — anthropic-compatible stripping", ()
     expect(hasVersion).toBeDefined();
   });
 
+  // api.anthropic.com bills claude-code-20250219 as Claude Code usage: a plain
+  // API key answers HTTP 400 "Your credit balance is too low" with it.
+  it("drops claude-code beta for an API key on api.anthropic.com, keeps it for OAuth", () => {
+    const executor = new DefaultExecutor("anthropic-compatible-official");
+    const psd = { baseUrl: "https://api.anthropic.com/v1" };
+    const beta = (creds) => {
+      const h = executor.buildHeaders({ ...creds, providerSpecificData: psd }, true, null, "claude-opus-5-5");
+      return h["Anthropic-Beta"] || h["anthropic-beta"] || "";
+    };
+    const apiKeyBeta = beta({ apiKey: "sk-ant-api03-xxx" });
+    expect(apiKeyBeta).not.toContain("claude-code-20250219");
+    expect(apiKeyBeta).toContain("context-management-2025-06-27");
+    expect(beta({ apiKey: "sk-ant-oat01-xxx" })).toContain("claude-code-20250219");
+  });
+
   // A node fronting Anthropic (rotating multi-account proxy, corporate gateway)
   // needs the same beta flags the `claude` provider sends. Without
   // context-management-2025-06-27 upstream answers HTTP 400

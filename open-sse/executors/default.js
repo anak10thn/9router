@@ -209,7 +209,14 @@ export class DefaultExecutor extends BaseExecutor {
         delete headers["Anthropic-Dangerous-Direct-Browser-Access"];
         delete headers["x-app"];
         delete headers["X-App"];
-        // Strip claude-code-20250219 from Anthropic-Beta / anthropic-beta
+      }
+      // Strip claude-code-20250219 from Anthropic-Beta / anthropic-beta. Besides
+      // third-party upstreams, api.anthropic.com itself bills that flag against
+      // Claude Code subscription usage: a plain API key gets
+      // "Your credit balance is too low" (HTTP 400) even with credits on the
+      // account. Keep it only for OAuth (sk-ant-oat) tokens.
+      const isOAuthToken = (credentials.apiKey || credentials.accessToken || "").includes("sk-ant-oat");
+      if (!isOfficialAnthropic || !isOAuthToken) {
         for (const betaKey of ["anthropic-beta", "Anthropic-Beta"]) {
           if (headers[betaKey]) {
             const filtered = headers[betaKey]
