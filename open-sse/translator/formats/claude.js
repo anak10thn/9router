@@ -3,6 +3,7 @@ import { DEFAULT_THINKING_CLAUDE_SIGNATURE } from "../../config/defaultThinkingS
 import { ROLE, CLAUDE_BLOCK } from "../schema/index.js";
 import { adjustMaxTokens } from "./maxTokens.js";
 import { applyCloaking } from "../../utils/claudeCloaking.js";
+import { CLAUDE_SYSTEM_PROMPT } from "../../config/appConstants.js";
 import { resolveSessionId } from "../../utils/sessionManager.js";
 import { isValidClaudeSignature } from "../../utils/claudeSignature.js";
 import { PROVIDERS } from "../../providers/index.js";
@@ -716,6 +717,15 @@ export function prepareClaudeRequest(body, provider = null, apiKey = null, conne
   if ((provider === "claude" || provider?.startsWith("anthropic-compatible")) && apiKey) {
     const sid = sessionId || resolveSessionId({ headers: rawHeaders, body, connectionId, scope: "claude" });
     body = applyCloaking(body, apiKey, sid);
+  }
+
+  // api.anthropic.com answers a plain API key with HTTP 400 "Your credit
+  // balance is too low" when the injected Claude Code identity prompt is
+  // present, so anthropic-compatible nodes keep it only for OAuth tokens.
+  if (provider?.startsWith("anthropic-compatible") && !apiKey?.includes("sk-ant-oat") && Array.isArray(body.system)) {
+    const system = body.system.filter((b) => b?.text !== CLAUDE_SYSTEM_PROMPT);
+    if (system.length) body.system = system;
+    else delete body.system;
   }
 
   return body;
